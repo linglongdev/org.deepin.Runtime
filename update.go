@@ -39,8 +39,8 @@ var (
 		"dtkwidget",
 		"dtklog",
 		"dtkcommon",
-		"dde-qtintegration",
-		"dde-qtplatform-plugins",
+		"qt5integration",
+		"dde-qt5platform-plugins",
 
 		"fcitx5-qt",
 		"deepin-shortcut-viewer",
