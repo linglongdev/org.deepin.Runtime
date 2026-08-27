@@ -1,0 +1,253 @@
+From 2f56e6bfd59c006b079395fba3e7515effc6c748 Mon Sep 17 00:00:00 2001
+From: yeshanshan <yeshanshan@uniontech.com>
+Date: Thu, 27 Aug 2026 14:53:28 +0800
+Subject: [PATCH] chore: switch runtime from Qt6 to Qt5 for DTK5 compatibility
+
+1. Replace all Qt6 package sources with Qt5 upstream Debian packages
+using -opensource-src naming convention
+2. Update qt6.conf to qt5.conf with corresponding path adjustments for
+Qt5 directory structure
+3. Modify build.bash and profile to reference Qt5 binary/qmake paths
+instead of Qt6
+4. Invert all package filtering logic to exclude Qt6 variants while
+retaining Qt5 packages (dtk6, qml6-module, qt6 dde plugins, fcitx5-qt6)
+5. Remove qt6-5compat (unnecessary compatibility layer for Qt5 runtime)
+and non-essential packages (deepin-shortcut-viewer, uos-license-content)
+6. Add idempotent YAML header rewriting for dtk5 runtime identification
+(org.deepin.runtime.dtk5)
+
+Log: Runtime environment updated from Qt6 to Qt5, adapting build scripts
+and package sources for DTK5 compatibility
+
+Influence:
+1. Verify build.bash executes successfully with Qt5 qmake version output
+2. Test environment variable paths in profile point to existing Qt5
+directories
+3. Confirm qt5.conf path configuration matches actual Qt5 installation
+layout
+4. Run update.go and verify only Qt5 packages are included in final
+dependency list
+5. Test YAML generation to ensure id/description fields correctly
+identify dtk5 runtime
+6. Verify dtkdeclarative QML modules include Qt5-style qml-module-*
+packages exclusively
+7. Check fcitx5-qt integration retains Qt5 frontend components
+8. Confirm applications using DTK5 APIs function correctly with the
+new runtime
+
+chore: 将运行时从 Qt6 切换到 Qt5 以兼容 DTK5
+
+1. 将所有 Qt6 包源替换为使用 -opensource-src 命名约定的 Qt5 上游 Debian
+包
+2. 将 qt6.conf 更新为 qt5.conf，并相应调整 Qt5 目录结构的路径
+3. 修改 build.bash 和 profile，将 Qt5 二进制/qmake 路径替代 Qt6
+4. 反转所有包过滤逻辑，排除 Qt6 变体同时保留 Qt5 包（dtk6、qml6-module、
+qt6 dde 插件、fcitx5-qt6）
+5. 移除 qt6-5compat（Qt5 运行时不需要的兼容层）和非必要包（deepin-
+shortcut-viewer、uos-license-content）
+6. 添加 dtk5 运行时标识的幂等 YAML 头部重写（org.deepin.runtime.dtk5）
+
+Log: 运行时环境从 Qt6 更新为 Qt5，调整构建脚本和包源以兼容 DTK5
+
+Influence:
+1. 验证 build.bash 能成功执行并输出 Qt5 qmake 版本信息
+2. 测试 profile 中的环境变量路径指向实际存在的 Qt5 目录
+3. 确认 qt5.conf 路径配置与实际 Qt5 安装布局一致
+4. 运行 update.go 并验证最终依赖列表中仅包含 Qt5 包
+5. 测试 YAML 生成确保 id/description 字段正确标识 dtk5 运行时
+6. 验证 dtkdeclarative QML 模块仅包含 Qt5 风格的 qml-module-* 包
+7. 检查 fcitx5-qt 集成保留了 Qt5 前端组件
+8. 确认使用 DTK5 API 的应用程序能在新运行时下正常运行
+---
+ build.bash |  4 ++--
+ profile    |  8 ++++----
+ qt5.conf   | 17 +++++++++++++++++
+ qt6.conf   | 17 -----------------
+ update.go  | 47 +++++++++++++++++++++++++++++------------------
+ 5 files changed, 52 insertions(+), 41 deletions(-)
+ create mode 100644 qt5.conf
+ delete mode 100644 qt6.conf
+
+diff --git a/build.bash b/build.bash
+index 42456ee..84d84e8 100644
+--- a/build.bash
++++ b/build.bash
+@@ -1,10 +1,10 @@
+ # 安装依赖
+ bash ./install_dep linglong/sources "$PREFIX"
+ # 添加qmake配置
+-envsubst <qt6.conf >$PREFIX/lib/qt6/bin/qt6.conf
++envsubst <qt5.conf >$PREFIX/lib/qt5/bin/qt5.conf
+ # 设置环境变量
+ mkdir -p $PREFIX/etc
+ cp profile $PREFIX/etc/
+ # 删除字体文件
+ rm -r $PREFIX/share/fonts
+-/runtime/lib/qt6/bin/qmake --version
+\ No newline at end of file
++/runtime/lib/qt5/bin/qmake --version
+\ No newline at end of file
+diff --git a/profile b/profile
+index 782441f..9c83a23 100644
+--- a/profile
++++ b/profile
+@@ -5,13 +5,13 @@ export QML_IMPORT_PATH=/opt/apps/$LINGLONG_APPID/files
+ # 读取当前base的架构
+ tripletList=$(cat /etc/linglong-triplet-list)
+ for triplet in $tripletList; do
+-    export QT_QPA_PLATFORM_PLUGIN_PATH="/runtime/lib/$triplet/qt6/plugins/platforms"
+-    export QML_IMPORT_PATH="/runtime/lib/$triplet/qt6/qml:$QML_IMPORT_PATH"
+-    export QT_PLUGIN_PATH="/runtime/lib/$triplet/qt6/plugins"
++    export QT_QPA_PLATFORM_PLUGIN_PATH="/runtime/lib/$triplet/qt5/plugins/platforms"
++    export QML_IMPORT_PATH="/runtime/lib/$triplet/qt5/qml:$QML_IMPORT_PATH"
++    export QT_PLUGIN_PATH="/runtime/lib/$triplet/qt5/plugins"
+     break
+ done
+ # https://doc.qt.io/qt-5/qtqml-syntax-imports.html#qml-import-path
+ export QML2_IMPORT_PATH=$QML_IMPORT_PATH
+ # 设置环境变量，方便在终端中使用qt工具
+-export PATH=$PATH:/runtime/lib/qt6/bin
++export PATH=$PATH:/runtime/lib/qt5/bin
+ export CMAKE_PREFIX_PATH=/usr:/runtime:$PREFIX
+diff --git a/qt5.conf b/qt5.conf
+new file mode 100644
+index 0000000..7473c32
+--- /dev/null
++++ b/qt5.conf
+@@ -0,0 +1,17 @@
++[Paths]
++Prefix=$PREFIX
++ArchData=lib/$TRIPLET/qt5
++Binaries=lib/qt5/bin
++Data=share/qt5
++Documentation=share/qt5/doc
++Headers=include/$TRIPLET/qt5
++HostBinaries=lib/qt5/bin
++HostData=lib/$TRIPLET/qt5
++HostLibraries=lib/$TRIPLET
++Libraries=lib/$TRIPLET
++LibraryExecutables=lib/qt5/libexec
++HostLibraryExecutables=lib/qt5/libexec
++Plugins=lib/$TRIPLET/qt5/plugins
++Qml2Imports=lib/$TRIPLET/qt5/qml
++Settings=/etc/xdg
++Translations=share/qt5/translations
+diff --git a/qt6.conf b/qt6.conf
+deleted file mode 100644
+index e843344..0000000
+--- a/qt6.conf
++++ /dev/null
+@@ -1,17 +0,0 @@
+-[Paths]
+-Prefix=$PREFIX
+-ArchData=lib/$TRIPLET/qt6
+-Binaries=lib/qt6/bin
+-Data=share/qt6
+-Documentation=share/qt6/doc
+-Headers=include/$TRIPLET/qt6
+-HostBinaries=lib/qt6/bin
+-HostData=lib/$TRIPLET/qt6
+-HostLibraries=lib/$TRIPLET
+-Libraries=lib/$TRIPLET
+-LibraryExecutables=lib/qt6/libexec
+-HostLibraryExecutables=lib/qt6/libexec
+-Plugins=lib/$TRIPLET/qt6/plugins
+-Qml2Imports=lib/$TRIPLET/qt6/qml
+-Settings=/etc/xdg
+-Translations=share/qt6/translations
+diff --git a/update.go b/update.go
+index f825a29..29d5531 100644
+--- a/update.go
++++ b/update.go
+@@ -22,17 +22,20 @@ var (
+ 	uosArch = []string{"mips64", "sw64"}
+ 
+ 	sources = []string{
+-		"qt6-base",
+-		"qt6-svg",
+-		"qt6-declarative",
+-		"qt6-imageformats",
+-		"qt6-multimedia",
+-		"qt6-speech",
+-		"qt6-tools",
+-		"qt6-wayland",
+-		"qt6-translations",
+-		"qt6-5compat",
+-
++		// Qt5 上游源包（Debian 命名 *-opensource-src），替代 DTK6 的 qt6-*
++		"qtbase-opensource-src",
++		"qtsvg-opensource-src",
++		"qtdeclarative-opensource-src",
++		"qtimageformats-opensource-src",
++		"qtmultimedia-opensource-src",
++		"qtspeech-opensource-src",
++		"qttools-opensource-src",
++		"qtwayland-opensource-src",
++		"qttranslations-opensource-src",
++		"qtquickcontrols2-opensource-src",
++		// qt6-5compat 是 Qt6→Qt5 兼容层，Qt5 runtime 不需要，已移除
++
++		// DTK 源包名不变（同源包同时产出 dtk5/dtk6 二进制，靠过滤逻辑区分）
+ 		"dtkcore",
+ 		"dtkdeclarative",
+ 		"dtkgui",
+@@ -43,8 +46,6 @@ var (
+ 		"dde-qt5platform-plugins",
+ 
+ 		"fcitx5-qt",
+-		"deepin-shortcut-viewer",
+-		"uos-license-content",
+ 	}
+ )
+ 
+@@ -91,25 +92,28 @@ func main() {
+ 				continue
+ 			}
+ 
+-			// 过滤dtk5
++			// 过滤dtk6（DTK5 runtime：保留 dtk5、排除 dtk6；与 DTK6 逻辑相反）
+ 			if src != "dtkcommon" {
+-				if strings.Contains(pkg, "dtk") && !strings.Contains(pkg, "dtk6") {
++				if strings.Contains(pkg, "dtk6") {
+ 					excludePackage(pkg)
+ 					continue
+ 				}
+ 			}
++			// dtkdeclarative 的 QML 模块：保留 Qt5 风格 qml-module-*，排除 Qt6 风格 qml6-module-*
+ 			if src == "dtkdeclarative" {
+-				if strings.HasPrefix(pkg, "qml-module") {
++				if strings.HasPrefix(pkg, "qml6-module") {
+ 					excludePackage(pkg)
+ 					continue
+ 				}
+ 			}
+-			if strings.HasPrefix(pkg, "dde-") && strings.Contains(pkg, "qt5") {
++			// dde-qt 集成：保留 qt5、排除 qt6（与 DTK6 逻辑相反）
++			if strings.HasPrefix(pkg, "dde-") && strings.Contains(pkg, "qt6") {
+ 				excludePackage(pkg)
+ 				continue
+ 			}
+ 
+-			if slices.Contains([]string{"fcitx5-frontend-qt5", "libfcitx5-qt-dev", "libfcitx5-qt1"}, pkg) {
++			// fcitx5-qt：保留 qt5 前端、排除 qt6（与 DTK6 逻辑相反）
++			if slices.Contains([]string{"fcitx5-frontend-qt6", "libfcitx5-qt6-dev", "libfcitx5-qt6-1"}, pkg) {
+ 				excludePackage(pkg)
+ 				continue
+ 			}
+@@ -181,6 +185,13 @@ func updateYamlFiles(content []byte) {
+ 			if strings.Contains(line, "linglong:gen_deb_source sources") {
+ 				break // 找到锚点，停止读取旧内容
+ 			}
++			// dtk5：包 id 与描述与基线 dtk6 不同，按行整体替换 yaml 头部（幂等，可重复运行）
++			if strings.HasPrefix(strings.TrimSpace(line), "id:") {
++				line = "  id: org.deepin.runtime.dtk5"
++			}
++			if strings.HasPrefix(strings.TrimSpace(line), "description:") {
++				line = "  description: Deepin Tool Kit 5 Widget"
++			}
+ 			newLines = append(newLines, line)
+ 		}
+ 		if slices.Contains(uosArch, arch) {
+--
+libgit2 1.7.2
+
