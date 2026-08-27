@@ -1,0 +1,70 @@
+From 40ead8fdbc5911f79dbb337acc7f3fffb69256ed Mon Sep 17 00:00:00 2001
+From: yeshanshan <yeshanshan@uniontech.com>
+Date: Thu, 27 Aug 2026 15:35:13 +0800
+Subject: [PATCH] feat: add qt6 webengine support to runtime
+
+1. Add QtWebEngine process and resources environment variables to
+   profile (QTWEBENGINEPROCESS_PATH, QTWEBENGINE_RESOURCES_PATH,
+   QTWEBENGINE_LOCALES_PATH) so the embedded browser can locate its
+   libexec/resources/translations under the runtime prefix
+2. Add qt6-webengine and qt6-webchannel source packages to the
+   update.go dependency list
+3. Rewrite the generated package id to org.deepin.runtime.webengine and
+   add error handling when writing the generated linglong.yaml
+
+Log: runtime now bundles the Qt6 WebEngine libraries and identifies
+itself as the webengine runtime variant
+
+Influence:
+1. Verify QtWebEngineProcess is found at /runtime/lib/qt6/libexec
+2. Confirm generated linglong.yaml uses org.deepin.runtime.webengine id
+3. Verify linglong.yaml generation no longer ignores write errors
+---
+ profile   |  5 +++++
+ update.go | 11 ++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/profile b/profile
+index 782441f..4d6c359 100644
+--- a/profile
++++ b/profile
+@@ -15,3 +15,8 @@ export QML2_IMPORT_PATH=$QML_IMPORT_PATH
+ # 设置环境变量，方便在终端中使用qt工具
+ export PATH=$PATH:/runtime/lib/qt6/bin
+ export CMAKE_PREFIX_PATH=/usr:/runtime:$PREFIX
++
++# webengine process path and resources path
++export QTWEBENGINEPROCESS_PATH=/runtime/lib/qt6/libexec/QtWebEngineProcess
++export QTWEBENGINE_RESOURCES_PATH=/runtime/share/qt6/resources
++export QTWEBENGINE_LOCALES_PATH=/runtime/share/qt6/translations/qtwebengine_locales
+diff --git a/update.go b/update.go
+index f825a29..4a710d0 100644
+--- a/update.go
++++ b/update.go
+@@ -33,6 +33,9 @@ var (
+ 		"qt6-translations",
+ 		"qt6-5compat",
+ 
++		"qt6-webengine",
++		"qt6-webchannel",
++
+ 		"dtkcore",
+ 		"dtkdeclarative",
+ 		"dtkgui",
+@@ -194,6 +197,12 @@ func updateYamlFiles(content []byte) {
+ 			newLines = append(newLines, source)
+ 		}
+ 		newContent := strings.Join(newLines, "\n") + "\n" + string(content)
+-		_ = os.WriteFile(file, []byte(newContent), 0644)
++
++		newContent = strings.Replace(newContent, "id: org.deepin.runtime.dtk", "id: org.deepin.runtime.webengine", 1)
++
++		err = os.WriteFile(file, []byte(newContent), 0644)
++		if err != nil {
++			panic(err)
++		}
+ 	}
+ }
+--
+libgit2 1.7.2
+
